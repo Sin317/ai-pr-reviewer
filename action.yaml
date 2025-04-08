@@ -1,0 +1,7 @@
+name: 'AI PR Reviewer Action'
+description: 'PR code summary and review using ollama llm'
+author: 'Khushi Mahesh'
+
+branding:
+  icon: 'eye'
+  color: 'blue'
