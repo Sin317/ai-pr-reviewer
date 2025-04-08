@@ -1,7 +1,110 @@
-name: 'AI PR Reviewer Action'
-description: 'PR code summary and review using ollama llm'
+name: 'AI PR Reviewer'
+description: 'AI-powered code review, chat, and documentation generation for pull requests'
 author: 'Khushi Mahesh'
-
 branding:
-  icon: 'eye'
+  icon: 'code'
   color: 'blue'
+
+inputs:
+  github_token:
+    description: 'GitHub token for API access'
+    required: true
+    default: ${{ github.token }}
+  pr_url:
+    description: 'URL of the Pull Request to review'
+    required: false
+    default: ${{ github.event.pull_request.html_url }}
+  model:
+    description: 'AI model to use'
+    required: false
+    default: 'qwen2.5-coder:3b'
+  mode:
+    description: 'Operation mode: review, chat, document, or monitor'
+    required: false
+    default: 'review'
+  comment_id:
+    description: 'Comment ID to process (only needed for chat mode with specific comments)'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+      
+    - name: Set Up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install Dependencies
+      run: pip install -r ${{ github.action_path }}/requirements.txt
+      shell: bash
+      
+    - name: Install Ollama
+      run: |
+        if ! command -v ollama &> /dev/null; then
+          curl -fsSL https://ollama.com/install.sh | sh
+        fi
+      shell: bash
+      
+    - name: Run Ollama
+      run: |
+        ollama serve &
+        sleep 5
+        ollama pull ${{ inputs.model }}
+      shell: bash
+        
+    - name: Run PR Review
+      if: inputs.mode == 'review'
+      run: |
+        python ${{ github.action_path }}/.github/scripts/pr_review_tool.py \
+          --pr-url "${{ inputs.pr_url }}" \
+          --ai-model "${{ inputs.model }}"
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        
+    - name: Run Chat Mode
+      if: inputs.mode == 'chat'
+      run: |
+        python ${{ github.action_path }}/.github/scripts/pr_review_tool.py \
+          --pr-url "${{ inputs.pr_url }}" \
+          --chat \
+          --ai-model "${{ inputs.model }}"
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        
+    - name: Process Comment
+      if: inputs.mode == 'process-comment' && inputs.comment_id
+      run: |
+        python ${{ github.action_path }}/.github/scripts/pr_review_tool.py \
+          --pr-url "${{ inputs.pr_url }}" \
+          --process-comment "${{ inputs.comment_id }}" \
+          --ai-model "${{ inputs.model }}"
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        
+    - name: Generate Documentation
+      if: inputs.mode == 'document'
+      run: |
+        python ${{ github.action_path }}/.github/scripts/pr_review_tool.py \
+          --pr-url "${{ inputs.pr_url }}" \
+          --document \
+          --ai-model "${{ inputs.model }}"
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        
+    - name: Monitor Comments
+      if: inputs.mode == 'monitor'
+      run: |
+        python ${{ github.action_path }}/.github/scripts/pr_review_tool.py \
+          --pr-url "${{ inputs.pr_url }}" \
+          --monitor \
+          --ai-model "${{ inputs.model }}"
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }} 
